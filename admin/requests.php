@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin']);
 
-$statuses = ['pending', 'approved', 'in-transit', 'delivered', 'cancelled'];
+$statuses = ['pending', 'approved', 'in-transit', 'delivered', 'cancelled', 'payment-pending'];
 
 // Fetch supplies, operators, drones for selectors
 $supplies = [];
@@ -331,7 +331,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $requests = [];
-$stmt = $conn->prepare("SELECT dr.*, u.name AS requester_name, h.name AS hospital_name, s.name AS supply_name, op.name AS operator_name, d.model AS drone_model
+
+// --- Filtering: payment_filter (all|paid|unpaid|pending), statuses[] (multi)
+$paymentFilter = $_GET['payment_filter'] ?? 'all';
+$statusFilter = $_GET['status'] ?? []; // array expected
+if (!is_array($statusFilter)) {
+    // accept comma-separated
+    $statusFilter = $statusFilter ? explode(',', $statusFilter) : [];
+}
+
+$allowedPayment = ['all', 'paid', 'unpaid', 'pending'];
+if (!in_array($paymentFilter, $allowedPayment, true)) {
+    $paymentFilter = 'all';
+}
+
+// sanitize status values
+$allowedStatuses = $statuses; // from above
+$selectedStatuses = [];
+foreach ($statusFilter as $st) {
+    if (in_array($st, $allowedStatuses, true)) {
+        $selectedStatuses[] = $st;
+    }
+}
+
+// Build SQL with dynamic WHERE clauses and prepared parameters
+$sql = "SELECT dr.*, u.name AS requester_name, h.name AS hospital_name, s.name AS supply_name, op.name AS operator_name, d.model AS drone_model
+    FROM DeliveryRequests dr
+    LEFT JOIN Users u ON dr.user_id = u.user_id
+    LEFT JOIN Hospitals h ON u.hospital_id = h.hospital_id
+    LEFT JOIN Supplies s ON dr.supply_id = s.supply_id
+    LEFT JOIN Users op ON dr.operator_id = op.user_id
+    LEFT JOIN Drones d ON dr.drone_id = d.drone_id";
+
+$where = [];
+$params = [];
+$types = '';
+
+if ($paymentFilter !== 'all') {
+    $where[] = 'dr.payment_status = ?';
+    $params[] = $paymentFilter === 'paid' ? 'paid' : ($paymentFilter === 'pending' ? 'pending' : 'unpaid');
+    $types .= 's';
+}
+
+if ($selectedStatuses) {
+    // build placeholders for IN
+    $placeholders = implode(',', array_fill(0, count($selectedStatuses), '?'));
+    $where[] = "dr.status IN ($placeholders)";
+    foreach ($selectedStatuses as $s) {
+        $params[] = $s;
+        $types .= 's';
+    }
+}
+
+if ($where) {
+    $sql .= ' WHERE ' . implode(' AND ', $where);
+}
+
+$sql .= "\n    ORDER BY 
+        CASE dr.status 
+            WHEN 'pending' THEN 1
+            WHEN 'approved' THEN 2
+            WHEN 'in-transit' THEN 3
+            WHEN 'delivered' THEN 4
+            WHEN 'cancelled' THEN 5
+            ELSE 6
+        END,
+        dr.request_id DESC";
+
+$stmt = $conn->prepare($sql);
+if ($stmt === false) {
+    // fallback to non-filtered query if prepare fails
+    $stmt = $conn->prepare("SELECT dr.*, u.name AS requester_name, h.name AS hospital_name, s.name AS supply_name, op.name AS operator_name, d.model AS drone_model
     FROM DeliveryRequests dr
     LEFT JOIN Users u ON dr.user_id = u.user_id
     LEFT JOIN Hospitals h ON u.hospital_id = h.hospital_id
@@ -347,6 +417,18 @@ $stmt = $conn->prepare("SELECT dr.*, u.name AS requester_name, h.name AS hospita
             WHEN 'cancelled' THEN 5
         END,
         dr.request_id DESC");
+} else {
+    if ($params) {
+        // bind params dynamically
+        $bindParams = array_merge([$types], $params);
+        $refs = [];
+        foreach ($bindParams as $key => $value) {
+            $refs[$key] = &$bindParams[$key];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+    }
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
@@ -384,6 +466,29 @@ include __DIR__ . '/../includes/header.php';
 <div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h5 mb-3">Delivery Requests</h2>
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-auto">
+                <label class="form-label small mb-1">Payment</label>
+                <select name="payment_filter" class="form-select">
+                    <option value="all"<?php echo ($paymentFilter === 'all') ? ' selected' : ''; ?>>All</option>
+                    <option value="paid"<?php echo ($paymentFilter === 'paid') ? ' selected' : ''; ?>>Paid</option>
+                    <option value="unpaid"<?php echo ($paymentFilter === 'unpaid') ? ' selected' : ''; ?>>Unpaid</option>
+                    <option value="pending"<?php echo ($paymentFilter === 'pending') ? ' selected' : ''; ?>>Pending</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-1">Status</label>
+                <select name="status[]" class="form-select" multiple size="3">
+                    <?php foreach ($allowedStatuses as $st): ?>
+                        <option value="<?php echo $st; ?>"<?php echo in_array($st, $selectedStatuses, true) ? ' selected' : ''; ?>><?php echo ucfirst($st); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-auto align-self-end">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="<?php echo BASE_PATH; ?>/admin/requests.php" class="btn btn-outline-secondary ms-1">Clear</a>
+            </div>
+        </form>
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead>
