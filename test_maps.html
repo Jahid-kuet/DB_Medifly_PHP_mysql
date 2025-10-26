@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Maps API Test</title>
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Maps API Test</h1>
+    <div id="status" class="status">Loading...</div>
+    <div id="map"></div>
+
+    <script>
+        function initMap() {
+            try {
+                const khulna = { lat: 22.8456, lng: 89.5403 };
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: khulna,
+                    zoom: 13
+                });
+                
+                new google.maps.Marker({
+                    position: khulna,
+                    map: map,
+                    title: 'Khulna, Bangladesh'
+                });
+
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').textContent = '✅ Google Maps API is working correctly!';
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        function handleMapError() {
+            document.getElementById('status').className = 'status error';
+            document.getElementById('status').innerHTML = `
+                <strong>❌ Google Maps API Error</strong><br>
+                <p>Possible reasons:</p>
+                <ul>
+                    <li>API key is invalid or expired</li>
+                    <li>API key restrictions don't allow this domain</li>
+                    <li>Billing is not enabled on Google Cloud Console</li>
+                    <li>Maps JavaScript API is not enabled</li>
+                </ul>
+                <p>Check the browser console (F12) for detailed error messages.</p>
+            `;
+        }
+
+        window.gm_authFailure = handleMapError;
+    </script>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDM3WrCKwVBIkBiyCBUgV6Ri1ro_oQ4kTg&callback=initMap&libraries=places" async defer onerror="handleMapError()"></script>
+</body>
+</html>
