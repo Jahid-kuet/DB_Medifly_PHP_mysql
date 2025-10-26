@@ -466,29 +466,60 @@ include __DIR__ . '/../includes/header.php';
 <div class="card shadow-sm">
     <div class="card-body">
         <h2 class="h5 mb-3">Delivery Requests</h2>
-        <form method="get" class="row g-2 mb-3">
-            <div class="col-auto">
-                <label class="form-label small mb-1">Payment</label>
-                <select name="payment_filter" class="form-select">
-                    <option value="all"<?php echo ($paymentFilter === 'all') ? ' selected' : ''; ?>>All</option>
-                    <option value="paid"<?php echo ($paymentFilter === 'paid') ? ' selected' : ''; ?>>Paid</option>
-                    <option value="unpaid"<?php echo ($paymentFilter === 'unpaid') ? ' selected' : ''; ?>>Unpaid</option>
-                    <option value="pending"<?php echo ($paymentFilter === 'pending') ? ' selected' : ''; ?>>Pending</option>
-                </select>
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#filterCard" aria-expanded="false" aria-controls="filterCard">
+                        <i class="bi bi-funnel"></i> Filters
+                    </button>
+                    <div class="collapse d-md-inline" id="filterCard">
+                        <div class="card card-body p-3 shadow-sm">
+                            <form method="get" class="row g-2 align-items-end">
+                                <div class="col-md-auto col-12">
+                                    <label class="form-label small mb-1">Payment</label>
+                                    <select name="payment_filter" class="form-select form-select-sm">
+                                        <option value="all"<?php echo ($paymentFilter === 'all') ? ' selected' : ''; ?>>All</option>
+                                        <option value="paid"<?php echo ($paymentFilter === 'paid') ? ' selected' : ''; ?>>Paid</option>
+                                        <option value="unpaid"<?php echo ($paymentFilter === 'unpaid') ? ' selected' : ''; ?>>Unpaid</option>
+                                        <option value="pending"<?php echo ($paymentFilter === 'pending') ? ' selected' : ''; ?>>Pending</option>
+                                    </select>
+                                </div>
+                                <div class="col-md col-12">
+                                    <label class="form-label small mb-1">Status</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <?php foreach ($allowedStatuses as $st): $cid = 'st_'.str_replace(['_',' '],'',$st); ?>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="status[]" value="<?php echo $st; ?>" id="<?php echo $cid; ?>" <?php echo in_array($st, $selectedStatuses, true) ? 'checked' : ''; ?>>
+                                                <label class="form-check-label small" for="<?php echo $cid; ?>"><?php echo ucfirst($st); ?></label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <div class="col-md-auto col-12 text-md-end">
+                                    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                    <a href="<?php echo BASE_PATH; ?>/admin/requests.php" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <div class="small text-muted">Active filters:</div>
+                    <div>
+                        <?php if ($paymentFilter !== 'all'): ?>
+                            <span class="badge bg-info text-dark me-1">Payment: <?php echo htmlspecialchars(ucfirst($paymentFilter)); ?></span>
+                        <?php endif; ?>
+                        <?php foreach ($selectedStatuses as $ss): ?>
+                            <span class="badge bg-secondary text-light me-1">Status: <?php echo htmlspecialchars(ucfirst($ss)); ?></span>
+                        <?php endforeach; ?>
+                        <?php if ($paymentFilter === 'all' && empty($selectedStatuses)): ?>
+                            <span class="text-muted">None</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
-            <div class="col-auto">
-                <label class="form-label small mb-1">Status</label>
-                <select name="status[]" class="form-select" multiple size="3">
-                    <?php foreach ($allowedStatuses as $st): ?>
-                        <option value="<?php echo $st; ?>"<?php echo in_array($st, $selectedStatuses, true) ? ' selected' : ''; ?>><?php echo ucfirst($st); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-auto align-self-end">
-                <button type="submit" class="btn btn-primary">Apply</button>
-                <a href="<?php echo BASE_PATH; ?>/admin/requests.php" class="btn btn-outline-secondary ms-1">Clear</a>
-            </div>
-        </form>
+        </div>
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead>
