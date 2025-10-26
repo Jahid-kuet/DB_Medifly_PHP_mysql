@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin']);
 
-$statuses = ['pending', 'approved', 'in-transit', 'delivered', 'cancelled', 'payment-pending'];
+$statuses = ['pending', 'approved', 'in-transit', 'delivered', 'cancelled'];
 
 // Fetch supplies, operators, drones for selectors
 $supplies = [];
@@ -330,9 +330,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$requests = [];
-
-// --- Filtering: payment_filter (all|paid|unpaid|pending), statuses[] (multi)
+// --- Filtering: payment_filter (all|paid|unpaid|pending), status[] (multi-select)
 $paymentFilter = $_GET['payment_filter'] ?? 'all';
 $statusFilter = $_GET['status'] ?? []; // array expected
 if (!is_array($statusFilter)) {
@@ -353,6 +351,8 @@ foreach ($statusFilter as $st) {
         $selectedStatuses[] = $st;
     }
 }
+
+$requests = [];
 
 // Build SQL with dynamic WHERE clauses and prepared parameters
 $sql = "SELECT dr.*, u.name AS requester_name, h.name AS hospital_name, s.name AS supply_name, op.name AS operator_name, d.model AS drone_model
@@ -520,6 +520,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         </div>
+
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead>
